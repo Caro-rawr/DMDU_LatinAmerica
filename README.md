@@ -44,8 +44,15 @@ The `/docs/` folder contains key resources for understanding and reproducing the
   Final output from the automated classification script.  
   It includes keyword match counts, proportions by module and category, word counts, and normalized density metrics — ready to use for visualization and further analysis.
 
-- - [`docs/column_descriptions.pdf`](docs/column_descriptions.pdf):  
+- [`docs/column_descriptions.pdf`](docs/column_descriptions.pdf):  
   Explanation of each column in the output CSV, including recommended metrics, visualizations, and use cases for analysis.
+
+- [`docs/DMDU_framework_tables.pdf`](docs/DMDU_framework_tables.pdf):  
+  Conceptual foundation of the classification framework used in this project.  
+  Includes definitions, categories, and examples for each module:
+  - Module 1: Types and manifestations of uncertainty
+  - Module 2: Stakeholder typologies and participation processes
+  - Module 3: Implementation challenges in decision-making contexts
 
 > 📁 Note: The folder `Data/papers_database/` is expected to contain full-text documents for processing, but it is not included in this repository due to copyright restrictions.  
 > Users can reconstruct this folder by sourcing the articles listed in the metadata file.
