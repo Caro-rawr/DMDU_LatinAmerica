@@ -34,7 +34,24 @@ The main `.Rmd` file (`Rmd/DMDU_LatinAmerica_analysis.Rmd`) performs automated c
 - `Rmd/` → Reproducible RMarkdown script  
 - `Data/` → Classification matrix (`dmdu_classification_matrix_with_keywords.xlsx`) and article corpus folder  
 - `Scripts/` → Additional R scripts  
-- `docs/` → Additional outputs or figures  
+- `docs/` → Additional outputs or figures
+- 
+## 📄 Documentation & Data
+
+The `/Data/` folder contains key resources for understanding and reproducing the analysis:
+
+- [`output_all_article_dmdu_classification_standardized.csv`](Data/output_all_article_dmdu_classification_standardized.csv):  
+  Final output from the automated classification script.  
+  It includes keyword match counts, proportions by module and category, word counts, and normalized density metrics — ready to use for visualization and further analysis.
+
+- [`dmdu_classification_matrix_with_keywords.xlsx`](Data/dmdu_classification_matrix_with_keywords.xlsx):  
+  The classification matrix used to code and interpret content across articles, organized by module, category, and keywords. Editable for extensions.
+
+- [`docs/column_descriptions.pdf`](docs/column_descriptions.pdf):  
+  Explanation of each column in the output CSV, including recommended metrics, visualizations, and use cases for analysis.
+
+> 📁 Note: The folder `Data/papers_database/` is expected to contain full-text documents for processing, but it is not included in this repository due to copyright restrictions.  
+> Users can reconstruct this folder by sourcing the articles listed in the metadata file.
 
 ## 📝 License & Citation
 Created with perseverance and collective effort by [Caro Cruz](https://github.com/Caro-rawr) and members of the Latin America Working Group of the DMDU Society.  
