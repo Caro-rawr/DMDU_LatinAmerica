@@ -1,0 +1,245 @@
+---
+title: "Multi-Article Classifier"
+author: "Caro/Yosune"
+date: "2025-05-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# 📚 Automated Classification of Multiple Articles
+As part of our effort to systematically review and compare academic literature related to DMDU, we developed a framework to classify articles based on three core analytical modules:
+
+1. Types and manifestations of uncertainty
+2. Stakeholders and participatory processes
+3. Implementation challenges in decision-making contexts
+
+The purpose of this framework is to identify patterns, gaps, and emphases across the literature — for instance, whether most studies address epistemic uncertainty, whether beneficiaries are considered as stakeholders, or which kinds of implementation challenges are most commonly cited in Latin American contexts.
+
+To make this process scalable and replicable, we constructed a classification matrix that links each category in the framework to a set of representative keywords. This matrix is editable and can be expanded to include additional fields such as methods (e.g., RDM, adaptive pathways), tools, or other relevant concepts.
+
+## ⚙️ What Does This Multi-Article Script Do?
+
+This script performs automated classification and standardization of multiple academic articles using a keyword-based framework. It reads and processes each article individually, matches content to pre-defined thematic categories, and generates a unified dataset for cross-article comparison.
+
+Specifically, it:
+1. Reads all .pdf, .docx, and .txt files in a target folder.
+2. Extracts and cleans the text of each article.
+3. Applies a classification matrix organized by module and category.
+4. Counts keyword matches and calculates standardized metrics:
+5. Relative weight of each category within its article and module,
+6. Density of mentions per 1,000 words.
+6. Produces a single, merged dataset suitable for visualization and thematic comparison across articles.
+______________________________________________________
+
+Este bloque instala y carga los paquetes necesarios para la lectura de datos, procesamiento de texto, visualización y manipulación de archivos.
+
+This chunk installs and loads the required packages for reading data, text processing, visualization, and file handling.
+
+``` {r Package Installation and Library Loading, echo=FALSE}
+install.packages(c("readxl", "stringr", "tm", "readtext", "pdftools"))
+
+library(readxl)
+library(stringr)
+library(tm)
+library(readtext)
+library(pdftools)
+library(ggplot2)
+library(dplyr)
+library(readr)
+```
+
+Define las rutas a:
+1. La matriz de clasificación en Excel, que contiene los módulos y sus palabras clave.
+2. La carpeta donde se almacenan los artículos en formato .pdf, .docx o .txt.
+3. Genera una lista de archivos válidos en esa carpeta.
+
+Defines the paths to:
+
+1. The Excel classification matrix containing modules and their keywords.
+2. The folder containing the articles (.pdf, .docx, or .txt).
+3. Generates a list of valid files in that folder.
+
+``` {r Define File Paths, echo=FALSE}
+matrix_path <- "data/dmdu_classification_matrix_with_keywords.xlsx"
+
+folder_path <- "data/papers_database"
+
+article_files <- list.files(folder_path, 
+                            pattern = "\\.(pdf|docx|txt)$", 
+                            full.names = TRUE, 
+                            ignore.case = TRUE)
+```
+
+
+Este bloque:
+1. Lee todas las hojas del archivo Excel y las guarda como lista de módulos.
+2. Define una función para leer texto desde distintos tipos de archivo (.pdf, .docx, .txt).
+3. Define una función para contar coincidencias con palabras clave.
+4. Itera sobre cada artículo:
+   4.1 Limpia el texto.
+   4.2 Cuenta el total de palabras.
+   4.3 Clasifica el contenido por módulo y categoría usando coincidencias de palabras clave.
+   4.4 Calcula el porcentaje interno dentro de cada módulo.
+   4.5 Guarda los resultados por artículo.
+
+
+This chunk performs key tasks:
+1. Reads all sheets in the Excel file and stores them as a list of modules.
+2. Defines a function to read text from various file types (.pdf, .docx, .txt).
+3. Defines a function to count keyword matches.
+4. Iterates over each article:
+   4.1 Cleans the text.
+   4.2 Counts total words.
+   4.3 Classifies content by module and category based on keyword matches.
+   4.4 Computes the percentage within each module.
+   4.5 Stores the results per article.
+
+```{r Read the Classification Matrix, read and clean the article Text echo=FALSE}
+# === 2. Read the classification matrix (each sheet is a module) ===
+sheets <- excel_sheets(matrix_path)
+matrix_list <- lapply(sheets, function(sheet) {
+  read_excel(matrix_path, sheet = sheet)
+})
+names(matrix_list) <- sheets
+
+
+# === 3. Function to read and clean text from files ===
+get_article_text <- function(path) {
+  ext <- tools::file_ext(path)
+  if (ext == "txt") {
+    return(tolower(readLines(path, warn = FALSE)))
+  } else if (ext == "pdf") {
+    return(tolower(paste(pdf_text(path), collapse = " ")))
+  } else if (ext == "docx") {
+    return(tolower(paste(readtext(path)$text, collapse = " ")))
+  } else {
+    stop("Unsupported file type.")
+  }
+}
+
+# === 4. Function to count occurrences of keywords ===
+match_keywords <- function(text, keywords) {
+  terms <- unlist(str_split(keywords, ",\\s*"))
+  sum(sapply(terms, function(term) str_count(text, fixed(trimws(term)))))
+}
+
+# === 5. Process each item in the folder ===
+all_results <- list()           # Results per article
+all_word_counts <- list()       #Total number of words per article
+
+for (file in article_files) {
+  
+  cat("Procesando archivo:", file, "\n")
+  
+ # Read and clean text
+  article_text <- get_article_text(file)
+  article_text <- tolower(article_text)
+  article_text <- removePunctuation(article_text)
+  article_text <- removeWords(article_text, stopwords("en"))
+  article_text <- stripWhitespace(article_text)
+  
+ # ===  Count number of words ===
+  word_count <- str_count(article_text, "\\S+")
+  article_word_counts <- data.frame(article = basename(file), total_words = word_count)
+  all_word_counts[[basename(file)]] <- article_word_counts
+  
+  results <- list()  # Results by module
+    # Process each module (sheet in Excel)
+  for (sheet in names(matrix_list)) {
+    df <- matrix_list[[sheet]]
+    if (!"keywords" %in% colnames(df)) next  # Skip sheets without keywords
+    
+    module_result <- data.frame(
+      category = df[[1]],
+      matches = sapply(df$keywords, function(kws) match_keywords(article_text, kws)),
+      stringsAsFactors = FALSE
+    )
+    
+    # Filter categories without matches
+    module_result <- module_result[module_result$matches > 0, ]
+    if (nrow(module_result) == 0) next
+    
+    module_result$percentage <- round(100 * module_result$matches / sum(module_result$matches), 1)
+    results[[sheet]] <- module_result
+  }
+  
+  # If there are no results, create empty entry
+  if (length(results) == 0) {
+    combined <- data.frame(module = NA, 
+                           category = NA, 
+                           matches = 0, 
+                           percentage = 0,
+                           stringsAsFactors = FALSE)
+  } else {
+   # Combine results by module
+    combined <- do.call(rbind, lapply(names(results), function(mod) {
+      df <- results[[mod]]
+      df$module <- mod
+      df
+    }))
+  }
+  combined$article <- basename(file)  # Item name
+  all_results[[basename(file)]] <- combined
+  
+  cat("\n---", basename(file), "---\n")
+  print(combined)
+}
+
+# === Consolidate total number of words per article ===
+word_counts_all <- bind_rows(all_word_counts)
+
+```
+
+Este bloque finaliza el análisis:
+1. Une todos los resultados en un solo dataframe.
+2. Calcula el total de coincidencias por artículo y por módulo.
+3. Une los totales y las cuentas de palabras al dataframe principal.
+4. Calcula tres métricas clave para comparar entre artículos:
+   4.1 prop_article: proporción del total de coincidencias que representa una categoría.
+   4.2 prop_module: proporción dentro del módulo correspondiente.
+   4.3 matches_per_1000w: densidad de menciones por cada 1,000 palabras.
+5. Exporta un archivo CSV estandarizado listo para visualizaciones y análisis.
+
+This block finalizes the analysis:
+1. Combines all results into a single dataframe.
+2. Calculates total keyword matches per article and per module.
+3. Joins the totals and word counts to the main dataframe.
+4. Calculates three key metrics for cross-article comparison:
+   4.1 prop_article: proportion of an article's total matches.
+   4.2 prop_module: proportion within the corresponding module.
+   4.3 matches_per_1000w: density of mentions per 1,000 words.
+5. Exports a standardized CSV file ready for visualization and analysis.
+
+```{r Keyword Matching Function echo=TRUE }
+# === 6. Consolidate results from all articles ===
+final_results <- do.call(rbind, all_results)
+
+# === STANDARDIZATION BLOCK ===
+final_results$matches <- as.numeric(final_results$matches)
+
+# 1. Total matches per item
+total_matches <- final_results %>%
+  group_by(article) %>%
+  summarise(total_matches_article = sum(matches, na.rm = TRUE))
+
+# 2. Total matches per module in each article
+module_totals <- final_results %>%
+  group_by(article, module) %>%
+  summarise(module_total = sum(matches, na.rm = TRUE))
+
+#3. Add proportions and bring it all together
+final_results_std <- final_results %>%
+  left_join(total_matches, by = "article") %>%
+  left_join(module_totals, by = c("article", "module")) %>%
+  left_join(word_counts_all, by = "article") %>%
+  mutate(
+    prop_article = round(100 * matches / total_matches_article, 2),
+    prop_module = round(100 * matches / module_total, 2),
+    matches_per_1000w = round(matches * 1000 / total_words, 2)
+  )
+
+# === Export final  CSV ===
+write.csv(final_results_std, "all_article_dmdu_classification_standardized.csv", row.names = FALSE)
+```
