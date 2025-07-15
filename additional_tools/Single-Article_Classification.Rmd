@@ -1,0 +1,204 @@
+---
+title: " Single-Article Classifier"
+author: "Yosune-Caro"
+date: "2025-04-07"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# 📚 Automated Classification of Single Article
+As part of our effort to systematically review and compare academic literature related to DMDU we developed a framework to classify articles based on three core analytical modules:
+
+1. Types and manifestations of uncertainty
+2. Stakeholders and participatory processes
+3. Implementation challenges in decision-making contexts
+
+The purpose of this framework is to identify patterns, gaps, and emphases across the literature — for instance, whether most studies address epistemic uncertainty, whether beneficiaries are considered as stakeholders, or which kinds of implementation challenges are most commonly cited in Latin American contexts.
+
+To make this process scalable and replicable, we constructed a classification matrix that links each category in the framework to a set of representative keywords. This matrix is editable and can be expanded to include additional fields such as methods (e.g., RDM, adaptive pathways), tools, or other concepts relevant to a specific line of inquiry.
+
+Hope you like it :)
+
+## ⚙️ What Does This Multi-Article Script Do?
+The R script performs the following operations:
+
+1. Loads an academic article in .pdf, .docx, or .txt format.
+2. Cleans and preprocesses the text of each article:
+   - Converts text to lowercase,
+   - Removes punctuation, stopwords, and extra whitespace.
+3. Loads the classification matrix, which contains categories and their associated keywords, organized by module.
+4. Scans the article for keyword matches, detecting:
+   - Which categories appear in the article,
+   - The number of times each category's keywords are mentioned,
+   - The percentage share of each category within its module.
+   - Outputs the results into a `.csv` file summarizing the article (The module, e.g., Uncertainty_Types; the category, e.g., Epistemic; the number of keyword matches; the percentage share of each category within its module; the article name)
+
+Step 1: Package Installation and Library Loading.
+```{r Package Installation and Library Loading, echo=FALSE}
+install.packages(c("readxl", "stringr", "tm", "readtext", "pdftools"))
+
+# Carga librerías
+library(readxl)
+library(stringr)
+library(tm)
+library(readtext)
+library(pdftools)
+```
+
+Step 2: Define File Paths.
+```{r Define File Paths, echo=FALSE}
+# Excel matrix with categories and keywords
+matrix_path <- "dmdu_classification_matrix_with_keywords.xlsx"
+
+# Path to the article to be analyzed (.txt, .pdf, .docx)
+article_path <- "Article.pdf"
+```
+
+Step 3: Read and Clean the Article Text.
+```{r Read and Clean the Article, Text echo=FALSE}
+get_article_text <- function(path) {
+  ext <- tools::file_ext(path)
+  if (ext == "txt") {
+    return(tolower(readLines(path, warn = FALSE)))
+  } else if (ext == "pdf") {
+    return(tolower(paste(pdf_text(path), collapse = " ")))
+  } else if (ext == "docx") {
+    return(tolower(paste(readtext(path)$text, collapse = " ")))
+  } else {
+    stop("Unsupported file type.")
+  }
+}
+
+article_text <- get_article_text(article_path)
+article_text <- tolower(article_text)
+article_text <- removePunctuation(article_text)
+article_text <- removeWords(article_text, stopwords("en"))
+article_text <- stripWhitespace(article_text)
+```
+
+Step 4: Read the Classification Matrix.
+Each sheet corresponds to a module (e.g., Uncertainty_Types, Participation_Levels, Challenges).
+Each row contains a category and associated keywords for matching.
+```{r, Read the Classification Matrix, Text echo=FALSE}
+
+sheets <- excel_sheets(matrix_path)
+matrix_list <- lapply(sheets, function(sheet) {
+  read_excel(matrix_path, sheet = sheet)
+})
+names(matrix_list) <- sheets
+```
+
+Step 5: Keyword Matching Function.
+This function: splits the keyword list by commas; searches the cleaned article text for each keyword; returns the total number of matches per category.
+```{r Keyword Matching Function, Text echo=FALSE}
+
+match_keywords <- function(text, keywords) {
+  terms <- unlist(str_split(keywords, ",\\s*"))
+  sum(sapply(terms, function(term) str_count(text, fixed(trimws(term)))))
+}
+```
+
+Step 6: Classify the Article by Module.
+Here checks each category for keyword matches. If a category has at least one match, it is included in the output. It also calculates the percentage share of each category within its module. The top 3 categories (by number of matches) are saved for summary generation.
+```{r Classify the Article by Module, Text echo=FALSE}
+
+results <- list()
+top_categories <- list()
+
+for (sheet in names(matrix_list)) {
+  df <- matrix_list[[sheet]]
+  if (!"keywords" %in% colnames(df)) next
+  
+  module_result <- data.frame(
+    category = df[[1]],
+    matches = sapply(df$keywords, function(kws) match_keywords(article_text, kws))
+  )
+  
+  module_result <- module_result[module_result$matches > 0, ]
+  if (nrow(module_result) == 0) next
+  
+  module_result$percentage <- round(100 * module_result$matches / sum(module_result$matches), 1)
+  results[[sheet]] <- module_result
+  
+  # Save the categories with the greatest presence
+  top_cat <- module_result[order(-module_result$matches), ][1:min(3, nrow(module_result)), ]
+  top_categories[[sheet]] <- top_cat$category
+}
+
+#prints the matches and percentages for each module to the console, helping you quickly see what was detected:
+
+for (mod in names(results)) {
+  cat("\n---", mod, "---\n")
+  print(results[[mod]])
+}
+```
+
+Step 7: Generate a Narrative Summary.
+This function builds a human-readable summary using the top categories from selected modules:
+Example output: 
+"The article addresses epistemic and ontological uncertainty. It involves regulators and affected communities as key decision actors. The participation level is mainly consultation. The main challenges discussed are methodological and institutional.
+```{r Generate a Narrative Summary, Text echo=FALSE}
+
+generate_summary <- function(top_cats) {
+  parts <- c()
+  
+  if ("Uncertainty_Types" %in% names(top_cats)) {
+    incert <- paste(top_cats[["Uncertainty_Types"]], collapse = " and ")
+    parts <- c(parts, paste("The article addresses", incert, "uncertainty."))
+  }
+  if ("Decision_Actors" %in% names(top_cats)) {
+    actors <- paste(top_cats[["Decision_Actors"]], collapse = " and ")
+    parts <- c(parts, paste("It involves", actors, "as key decision actors."))
+  }
+  if ("Participation_Levels" %in% names(top_cats)) {
+    part <- paste(top_cats[["Participation_Levels"]], collapse = " and ")
+    parts <- c(parts, paste("The participation level is mainly", part, "."))
+  }
+  if ("Challenges" %in% names(top_cats)) {
+    chals <- paste(top_cats[["Challenges"]], collapse = " and ")
+    parts <- c(parts, paste("The main challenges discussed are", chals, "."))
+  }
+  
+  summary_text <- paste(parts, collapse = " ")
+  return(summary_text)
+}
+
+cat("\n🔎 Summary:\n")
+cat(generate_summary(top_categories))
+#This summary gives a quick, interpretable overview of the article’s thematic focus :D
+```
+
+Step 8: Export Individual Module Summaries (Optional).
+This part of the script optionally exports each module's result (e.g., Uncertainty, Participation) as separate CSV files.
+```{r Summaries, Text echo=FALSE}
+for (mod in names(results)) {
+  write.csv(results[[mod]], paste0("summary_", mod, ".csv"), row.names = FALSE)
+}
+```
+
+Step 9: Save Final Summary. 
+This final block combines all results into one table, adds a row containing the narrative summary and saves everything into a single file called article_dmdu_classification_summary.csv
+```{r Final summary, Text echo=FALSE}
+
+combined <- do.call(rbind, lapply(names(results), function(mod) {
+  df <- results[[mod]]
+  df$module <- mod
+  df
+}))
+
+#Rearrange columns
+combined <- combined[, c("module", "category", "matches", "percentage")]
+
+#Create row for narrative summary
+summary_row <- data.frame(
+  module = "Narrative_Summary",
+  category = generate_summary(top_categories),
+  matches = "",
+  percentage = "",
+  stringsAsFactors = FALSE
+)
+final_summary <- rbind(combined, summary_row)
+
+write.csv(final_summary, "article_dmdu_classification_summary.csv", row.names = FALSE)
+```
