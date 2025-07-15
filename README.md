@@ -33,7 +33,7 @@ The main `.Rmd` file (`Rmd/DMDU_LatinAmerica_analysis.Rmd`) performs automated c
 
 - `Rmd/` → Reproducible RMarkdown script  
 - `Data/` → Classification matrix (`dmdu_classification_matrix_with_keywords.xlsx`) and article corpus folder  
-- `Scripts/` → Additional R scripts  
+- `Aditional_tools/` → Additional R scripts (For example, `Single-Article_Classification.Rmd` applies the classification framework to a single document, producing a narrative summary)
 - `docs/` → Additional outputs or figures
 - 
 ## 📄 Documentation 
