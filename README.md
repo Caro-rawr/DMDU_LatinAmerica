@@ -47,7 +47,7 @@ The `/docs/` folder contains key resources for understanding and reproducing the
 - [`docs/column_descriptions.pdf`](docs/column_descriptions.pdf):  
   Explanation of each column in the output CSV, including recommended metrics, visualizations, and use cases for analysis.
 
-- [`docs/DMDU_framework_tables.pdf`](docs/DMDU_framework_tables.pdf):  
+- [`docs/dmdu_framework_tables.pdf`](docs/dmdu_framework_tables.pdf):  
   Conceptual foundation of the classification framework used in this project.  
   Includes definitions, categories, and examples for each module:
   - Module 1: Types and manifestations of uncertainty
