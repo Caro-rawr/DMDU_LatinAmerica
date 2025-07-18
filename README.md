@@ -58,7 +58,7 @@ The `/docs/` folder contains key resources for understanding and reproducing the
 > Users can reconstruct this folder by sourcing the articles listed in the metadata file.
 
 ## 📝 License & Citation
-Created with perseverance and collective effort by [Caro Cruz](https://github.com/Caro-rawr) and members of the Latin America Working Group of the DMDU Society.  
+Created with perseverance and collective effort by members of the Latin America Working Group of the DMDU Society.  
 Feel free to reach out to me or to our representative, [Conceição de Maria Alves](cmaalves@gmail.com), if you'd like to contribute or collaborate.
 
 This work is released under the [Creative Commons Attribution 4.0 International](https://creativecommons.org/licenses/by/4.0/) license.  
