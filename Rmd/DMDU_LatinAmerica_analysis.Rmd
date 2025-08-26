@@ -38,7 +38,7 @@ Este bloque instala y carga los paquetes necesarios para la lectura de datos, pr
 This chunk installs and loads the required packages for reading data, text processing, visualization, and file handling.
 
 ``` {r Package Installation and Library Loading, echo=FALSE}
-install.packages(c("readxl", "stringr", "tm", "readtext", "pdftools"))
+install.packages(c("readxl", "stringr", "tm", "readtext", "pdftools", "textstem", "tokenizers", "stopwords", "stringi"))
 
 library(readxl)
 library(stringr)
@@ -48,6 +48,10 @@ library(pdftools)
 library(ggplot2)
 library(dplyr)
 library(readr)
+library(texstem)
+library (tokenizers)
+library(stopwords)
+library(stringi)
 ```
 
 Define las rutas a:
@@ -243,3 +247,4 @@ final_results_std <- final_results %>%
 # === Export final  CSV ===
 write.csv(final_results_std, "all_article_dmdu_classification_standardized.csv", row.names = FALSE)
 ```
+
