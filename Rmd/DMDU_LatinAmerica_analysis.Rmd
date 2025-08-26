@@ -122,32 +122,94 @@ get_article_text <- function(path) {
     stop("Unsupported file type.")
   }
 }
-
-# === 4. Function to count occurrences of keywords ===
-match_keywords <- function(text, keywords) {
-  terms <- unlist(str_split(keywords, ",\\s*"))
-  sum(sapply(terms, function(term) str_count(text, fixed(trimws(term)))))
+# === 4. Normalize ===
+normalize_text <- function(x) {
+  # a) minusculas
+  x <- tolower(x)
+  # b) quitar diacríticos (á->a, ç->c)
+  x <- stringi::stri_trans_general(x, "Latin-ASCII")
+  # c) fuera puntuación y números
+  x <- gsub("[[:punct:]]+", " ", x)
+  x <- gsub("[0-9]+", " ", x)
+  # d) espacios
+  x <- gsub("\\s+", " ", x)
+  trimws(x)
 }
 
-# === 5. Process each item in the folder ===
+# === 5. Stopwords multilingüe (EN/ES/PT) === 
+drop_stopwords_multi <- function(tokens_vec) {
+  sw <- unique(c(
+    stopwords::stopwords("en"),
+    stopwords::stopwords("es"),
+    stopwords::stopwords("pt")
+  ))
+  tokens_vec[!(tokens_vec %in% sw)]
+}
+
+# === 6. Tokenization +  lemmatization  ===
+make_unigrams <- function(text_norm, use_english_lemma = FALSE) {
+  toks <- tokenizers::tokenize_words(text_norm, strip_punct = TRUE,
+                                     strip_numeric = TRUE, lowercase = FALSE)[[1]]
+  toks <- drop_stopwords_multi(toks)
+  # Opcional, SOLO mejora inglés; deja comentado si tu corpus es mixto:
+  # if (use_english_lemma) toks <- textstem::lemmatize_words(toks)
+  toks
+}
+
+# === 7. Construction of n-grams (2 and 3) from the complete normalized text  ===
+make_ngrams <- function(text_norm) {
+  # bigrams y trigrams directamente del texto normalizado
+  bi <- tokenizers::tokenize_ngrams(text_norm, n = 2, n_min = 2)[[1]]
+  tri <- tokenizers::tokenize_ngrams(text_norm, n = 3, n_min = 3)[[1]]
+  c(bi, tri)
+}
+
+# === 8. Keyword pre-processing ===
+prep_keywords <- function(keywords_str) {
+  terms <- unlist(stringr::str_split(keywords_str, ",\\s*"))
+  terms <- normalize_text(terms)
+  unique(terms[nchar(terms) > 0])
+}
+
+# === 9. Function to count occurrences of keywords ===
+match_keywords <- function(index_tokens, keywords_str) {
+  terms <- prep_keywords(keywords_str)
+  expand_compounds <- function(t) {
+    if (grepl("\\bdecision\\s+making\\b", t)) return(c(t, "decision-making", "decisionmaking"))
+    if (grepl("\\bstake\\s*holder", t))     return(c(t, "stake-holder", "stakeholders", "stakeholder"))
+    t
+  }
+  expanded_terms <- unique(unlist(lapply(terms, expand_compounds)))
+# Normalizes in case the expansion added non-normalized variants
+  expanded_terms <- normalize_text(expanded_terms)
+  # Count: exact match after normalization
+  sum(expanded_terms %in% index_tokens)
+}
+
+# === 10. Process each item in the folder ===
 all_results <- list()           # Results per article
 all_word_counts <- list()       #Total number of words per article
 
 for (file in article_files) {
   
   cat("Procesando archivo:", file, "\n")
-  
+
  # Read and clean text
-  article_text <- get_article_text(file)
-  article_text <- tolower(article_text)
-  article_text <- removePunctuation(article_text)
-  article_text <- removeWords(article_text, stopwords("en"))
-  article_text <- stripWhitespace(article_text)
+# 1) Raw text
+article_text_raw <- get_article_text(file)
+# 2) Basic normalization (lowercase, no diacritics, no punctuation/numbers)
+article_text_norm <- normalize_text(article_text_raw)
+# 3)Unigrams (with EN/ES/PT stopwords removed; optional lemmatize EN)
+unigrams <- make_unigrams(article_text_norm, use_english_lemma = TRUE)
+# 4) N-grams 2 and 3 (from the full normalized text)
+ngrams_23 <- make_ngrams(article_text_norm)
+# 5)Final index: we join unigrams + n-grams
+index_tokens <- unique(c(unigrams, ngrams_23))
   
- # ===  Count number of words ===
-  word_count <- str_count(article_text, "\\S+")
-  article_word_counts <- data.frame(article = basename(file), total_words = word_count)
-  all_word_counts[[basename(file)]] <- article_word_counts
+ # === 11. Count number of words ===
+word_count <- length(unigrams)
+article_word_counts <- data.frame(article = basename(file), total_words = word_count)
+all_word_counts[[basename(file)]] <- article_word_counts
   
   results <- list()  # Results by module
     # Process each module (sheet in Excel)
@@ -157,7 +219,7 @@ for (file in article_files) {
     
     module_result <- data.frame(
       category = df[[1]],
-      matches = sapply(df$keywords, function(kws) match_keywords(article_text, kws)),
+      matches = sapply(df$keywords, function(kws) match_keywords(index_tokens, kws)),
       stringsAsFactors = FALSE
     )
     
@@ -191,7 +253,7 @@ for (file in article_files) {
   print(combined)
 }
 
-# === Consolidate total number of words per article ===
+# === 12. Consolidate total number of words per article ===
 word_counts_all <- bind_rows(all_word_counts)
 
 ```
@@ -217,7 +279,7 @@ This block finalizes the analysis:
 5. Exports a standardized CSV file ready for visualization and analysis.
 
 ```{r Keyword Matching Function echo=TRUE }
-# === 6. Consolidate results from all articles ===
+# === 13. Consolidate results from all articles ===
 final_results <- do.call(rbind, all_results)
 
 # === STANDARDIZATION BLOCK ===
@@ -245,6 +307,7 @@ final_results_std <- final_results %>%
   )
 
 # === Export final  CSV ===
-write.csv(final_results_std, "all_article_dmdu_classification_standardized.csv", row.names = FALSE)
+write.csv(final_results_std, "all_article_dmdu_classification_NGRAMS.csv", row.names = FALSE)
 ```
+
 
